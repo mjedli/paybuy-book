@@ -7,15 +7,15 @@ import java.security.Principal;
 import java.time.format.DateTimeFormatter;
 import java.util.Random;
 
-import javax.mail.internet.MimeMessage;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.ui.ModelMap;
@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import jakarta.mail.internet.MimeMessage;
 
 import com.mjedli.paybuy.login.model.LoginPojo;
 import com.mjedli.paybuy.login.model.HomeObject;
@@ -52,6 +53,9 @@ public class LoginController {
 	
 	@Autowired
 	private JavaMailSender emailSender;
+	
+	@Autowired
+	private PasswordEncoder passwordEncoder;
 	
 	private static final Logger log = LoggerFactory.getLogger(LoginController.class);
 	
@@ -103,12 +107,12 @@ public class LoginController {
 		
 		LoginPojo barber = new LoginPojo();
 		barber.setEmail(barber1.getEmail());
-		barber.setPassword(barber1.getPassword());
+		barber.setPassword(passwordEncoder.encode(barber1.getPassword()));
 		
 		// TODO Bouchon to remove
 		barber.setActive(true);
 		
-		MimeMessage mimeMessage = emailSender.createMimeMessage();
+		jakarta.mail.internet.MimeMessage mimeMessage = emailSender.createMimeMessage();
 		MimeMessageHelper message = new MimeMessageHelper(mimeMessage, "utf-8"); 
         
 		message.setFrom("noreply@barber.com");
@@ -175,7 +179,7 @@ public class LoginController {
 	private String updatePassword(@ModelAttribute LoginPojo barber) {
         LoginPojo barber1 = parismonService.findParismonByMail(barber.getEmail());
         if(barber1 != null && barber1.getActiveMailToken().equals(barber.getActiveMailToken())) {
-	        barber1.setPassword(barber.getPassword());
+	        barber1.setPassword(passwordEncoder.encode(barber.getPassword()));
 	        barber1.setActiveMailToken("");
 			parismonService.updateParismon(barber1);
 			return HREF_BASE + "/login";
@@ -185,14 +189,14 @@ public class LoginController {
 	}
 	
 	@PostMapping(value = HREF_BASE + "/forget/password")
-	private String forgetPassword(@ModelAttribute LoginPojo barber) {
+	private String forgetPassword(@ModelAttribute LoginPojo barber) throws MailException {
 		try {
 
         LoginPojo barber1 = parismonService.findParismonByMail(barber.getEmail());
         
         if(barber1 != null && barber1.getEmail().equals(barber.getEmail())) {
         
-			MimeMessage mimeMessage = emailSender.createMimeMessage();
+        	MimeMessage mimeMessage = emailSender.createMimeMessage();
 			MimeMessageHelper message = new MimeMessageHelper(mimeMessage, "utf-8");
 		
             int leftLimit = 97; // letter 'a'
